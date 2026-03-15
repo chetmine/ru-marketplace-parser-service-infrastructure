@@ -1,0 +1,107 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: posgres-infra
+    restart: unless-stopped
+    environment:
+      AUTH_SERVICE_DB_PASSWORD: ${AUTH_SERVICE_DB_PASSWORD}
+      PARSER_SERVICE_DB_PASSWORD: ${PARSER_SERVICE_DB_PASSWORD}
+
+      POSTGRES_USER: ${POSTGRES_ROOT_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_ROOT_PASSWORD}
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:rw
+    ports:
+      - "15432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_ROOT_USER} -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - infra_net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: rabbitmq-infra
+    restart: unless-stopped
+    environment:
+      PARSER_SERVICE_RABBITMQ_PASSWORD: ${PARSER_SERVICE_RABBITMQ_PASSWORD}
+      AUTH_SERVICE_RABBITMQ_PASSWORD: ${AUTH_SERVICE_RABBITMQ_PASSWORD}
+
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      RABBITMQ_DEFAULT_VHOST: /
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./rabbitmq/00-init.sh:/docker-entrypoint-initdb.d/00-init.sh:rw
+      - ./rabbitmq/definitions.template.json:/etc/rabbitmq/definitions.template.json:rw
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    entrypoint: /bin/sh -c "/docker-entrypoint-initdb.d/00-init.sh & exec docker-entrypoint.sh rabbitmq-server"
+    networks:
+      - infra_net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis-infra
+    restart: unless-stopped
+    environment:
+      REDIS_ROOT_PASSWORD: ${REDIS_ROOT_PASSWORD}
+      REDIS_AUTH_SERVICE_PASSWORD: ${REDIS_AUTH_SERVICE_PASSWORD}
+      REDIS_PARSER_SERVICE_PASSWORD: ${REDIS_PARSER_SERVICE_PASSWORD}
+    volumes:
+      - redis_data:/data
+      - ./redis/init.sh:/usr/local/bin/init.sh
+      - ./redis/redis.conf:/etc/redis/redis.conf:ro
+      - ./redis/users.template.acl:/etc/redis/users.template.acl:rw
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_ROOT_PASSWORD}", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    entrypoint: /bin/sh -c "/usr/local/bin/init.sh && exec redis-server /etc/redis/redis.conf"
+    networks:
+      - infra_net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  postgres_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  infra_net:
+    name: infra_net
+    driver: bridge
+

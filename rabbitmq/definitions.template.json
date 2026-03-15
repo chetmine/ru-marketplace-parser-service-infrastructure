@@ -1,0 +1,156 @@
+{
+  "rabbit_version": "3.12.0",
+  "rabbitmq_version": "3.12.0",
+  "vhosts": [
+    { "name": "/" }
+  ],
+  "users": [
+    {
+      "name": "parser_service",
+      "password_hash": "{{PARSER_HASH}}",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": [""],
+      "limits": {}
+    },
+    {
+      "name": "auth_service",
+      "password_hash": "{{AUTH_HASH}}",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": [""],
+      "limits": {}
+    }
+  ],
+  "permissions": [
+    {
+      "user": "parser_service",
+      "vhost": "/",
+      "configure": "^(marketplace\\.parser.*|tasks.*)$",
+      "write": "^marketplace\\.parser$",
+      "read": "^(tasks\\.preview|tasks\\.detailed)$"
+    },
+    {
+      "user": "auth_service",
+      "vhost": "/",
+      "configure": "^(marketplace\\.parser\\.(preview|detailed)|tasks)$",
+      "write": "^(tasks|marketplace\\.parser\\.(preview|detailed))$",
+      "read": "^(marketplace\\.parser|marketplace\\.parser\\.(preview|detailed))$"
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "marketplace.parser",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "tasks",
+      "vhost": "/",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "tasks.dlx",
+      "vhost": "/",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "marketplace.parser.preview",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "marketplace.parser.detailed",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "tasks.preview",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "tasks.dlx",
+        "x-dead-letter-routing-key": "tasks.preview"
+      }
+    },
+    {
+      "name": "tasks.detailed",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "tasks.dlx",
+        "x-dead-letter-routing-key": "tasks.detailed"
+      }
+    },
+    {
+      "name": "tasks.preview.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "tasks.detailed.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    }
+  ],
+  "bindings": [
+    {
+      "source": "tasks.dlx",
+      "vhost": "/",
+      "destination": "tasks.preview.dlq",
+      "destination_type": "queue",
+      "routing_key": "tasks.preview",
+      "arguments": {}
+    },
+    {
+      "source": "tasks.dlx",
+      "vhost": "/",
+      "destination": "tasks.detailed.dlq",
+      "destination_type": "queue",
+      "routing_key": "tasks.detailed",
+      "arguments": {}
+    },
+    {
+      "source": "tasks",
+      "vhost": "/",
+      "destination": "tasks.preview",
+      "destination_type": "queue",
+      "routing_key": "tasks.preview",
+      "arguments": {}
+    },
+    {
+      "source": "tasks",
+      "vhost": "/",
+      "destination": "tasks.detailed",
+      "destination_type": "queue",
+      "routing_key": "tasks.detailed",
+      "arguments": {}
+    }
+  ],
+  "parameters": [],
+  "global_parameters": [],
+  "policies": [],
+  "topic_permissions": []
+}
